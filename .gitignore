@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.swo
+
+# Environments
+.env
+venv/
+.venv/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Flask uploads and runtime
+static/uploads/
+instance/
+*.sqlite3
+
+# Model artifacts (keep local, don't commit large binaries)
+models/*.h5
+models/*.keras
+models/*.tflite
+models/*/
+!models/__init__.py
+!models/model_service.py
+
+# Logs
+logs/
+*.log
+
+# Dataset images (keep structure but ignore actual images)
+data/images/**/*.jpg
+data/images/**/*.jpeg
+data/images/**/*.png
+data/images/**/*.gif
+!data/images/**/.gitkeep

@@ -1,0 +1,15 @@
+Flask==2.3.3
+Werkzeug==2.3.7
+Pillow==10.4.0
+numpy  # Use latest wheel available for your Python version
+python-dotenv==1.0.1
+matplotlib  # For training visualizations
+
+# Deep Learning frameworks (choose one or both)
+torch>=2.0.0  # PyTorch - has Python 3.13 support
+torchvision>=0.15.0
+timm  # PyTorch Image Models (for rexnet_150 and other architectures)
+
+# TensorFlow wheels are not currently available for Python 3.13 on Windows.
+# If you need TensorFlow, create a Python 3.11 virtual environment and use tensorflow==2.17.0
+# tensorflow==2.17.0

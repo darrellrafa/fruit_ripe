@@ -1,0 +1,6 @@
+# This file ensures the train directory is tracked by git
+# Add your training images in subdirectories like:
+# banana_ripe/
+# banana_unripe/
+# apple_ripe/
+# apple_unripe/

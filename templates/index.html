@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fruit Ripeness Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet">
+    <style>
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 20px 0;
+        }
+        .upload-area:hover {
+            border-color: #0d6efd;
+            background-color: #f8f9fa;
+        }
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            margin: 20px 0;
+            display: none;
+            border-radius: 8px;
+        }
+        .result-card {
+            display: none;
+            margin-top: 30px;
+        }
+        .spinner {
+            display: none;
+            margin: 20px auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="text-center mb-5">
+                    <h1 class="display-5 fw-bold">🍎 Fruit Ripeness Analyzer</h1>
+                    <p class="lead">Upload an image of a fruit to check its ripeness level</p>
+                </div>
+
+                <div class="card shadow">
+                    <div class="card-body p-4">
+                        <form id="uploadForm" enctype="multipart/form-data">
+                            <div class="upload-area" id="dropZone">
+                                <input type="file" id="fileInput" accept="image/*" class="d-none">
+                                <div class="py-4">
+                                    <i class="bi bi-cloud-arrow-up fs-1 text-muted"></i>
+                                    <h5>Drag & Drop your image here</h5>
+                                    <p class="text-muted">or click to browse files (JPG, PNG, GIF)</p>
+                                    <button type="button" class="btn btn-primary" id="browseBtn">Select Image</button>
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <img id="preview" class="preview-image img-fluid" alt="Preview">
+                                
+                                <div class="spinner-border text-primary spinner" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                
+                                <div class="alert alert-danger mt-3" id="errorAlert" style="display: none;">
+                                    <i class="bi bi-exclamation-triangle-fill"></i> <span id="errorMessage"></span>
+                                </div>
+                                
+                                <div class="result-card" id="resultCard">
+                                    <h4 class="mt-4">Analysis Result</h4>
+                                    <div class="card mt-3">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <h5 class="card-title mb-0">Fruit: <span id="fruitName">-</span></h5>
+                                                <span class="badge bg-success" id="ripenessBadge">-</span>
+                                            </div>
+                                            <div class="progress mb-3" style="height: 25px;">
+                                                <div id="confidenceBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                     role="progressbar" style="width: 0%" aria-valuenow="0" 
+                                                     aria-valuemin="0" aria-valuemax="100">0%</div>
+                                            </div>
+                                            <p class="card-text" id="confidenceText">Confidence: 0%</p>
+                                            <p class="card-text" id="adviceText"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Live Camera Analyze -->
+                <div class="card shadow mt-4">
+                    <div class="card-body p-4">
+                        <h4 class="mb-3"><i class="bi bi-camera-video me-2"></i>Live Camera Analyze</h4>
+                        <p class="text-muted">Use your device camera to analyze fruit ripeness in real-time.</p>
+
+                        <div class="mb-3 d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-outline-primary" id="startCameraBtn"><i class="bi bi-play-fill me-1"></i>Start Camera</button>
+                            <button type="button" class="btn btn-outline-secondary" id="stopCameraBtn" disabled><i class="bi bi-stop-fill me-1"></i>Stop Camera</button>
+                            <button type="button" class="btn btn-primary" id="captureBtn" disabled><i class="bi bi-camera-fill me-1"></i>Capture & Analyze</button>
+                            <button type="button" class="btn btn-outline-info" id="toggleDatasetBtn" disabled><i class="bi bi-database me-1"></i>Dataset Mode</button>
+                        </div>
+
+                        <!-- Dataset Collection -->
+                        <div class="card bg-light mb-3" id="datasetCard" style="display: none;">
+                            <div class="card-body">
+                                <h6 class="card-title"><i class="bi bi-database me-1"></i>Save Frame to Dataset</h6>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label for="classSelect" class="form-label">Class:</label>
+                                        <select class="form-select form-select-sm" id="classSelect">
+                                            <option value="banana_ripe">Banana - Ripe</option>
+                                            <option value="banana_unripe">Banana - Unripe</option>
+                                            <option value="apple_ripe">Apple - Ripe</option>
+                                            <option value="apple_unripe">Apple - Unripe</option>
+                                            <option value="orange_ripe">Orange - Ripe</option>
+                                            <option value="orange_unripe">Orange - Unripe</option>
+                                            <option value="custom">Custom...</option>
+                                        </select>
+                                        <input type="text" class="form-control form-control-sm mt-1" id="customClass" placeholder="e.g., mango_ripe" style="display: none;">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="splitSelect" class="form-label">Split:</label>
+                                        <select class="form-select form-select-sm" id="splitSelect">
+                                            <option value="train">Train</option>
+                                            <option value="val">Validation</option>
+                                            <option value="test">Test</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3 d-flex align-items-end">
+                                        <button type="button" class="btn btn-success btn-sm w-100" id="saveFrameBtn" disabled><i class="bi bi-save me-1"></i>Save Frame</button>
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <small class="text-muted">Saved: <span id="savedCount">0</span> images</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="autoAnalyzeSwitch" disabled>
+                            <label class="form-check-label" for="autoAnalyzeSwitch">Auto analyze every <span id="intervalLabel">1200</span> ms</label>
+                        </div>
+                        <input type="range" class="form-range" min="500" max="3000" step="100" id="intervalRange" value="1200" disabled>
+
+                        <div class="ratio ratio-4x3 bg-dark rounded overflow-hidden">
+                            <video id="cameraVideo" autoplay playsinline muted class="w-100 h-100"></video>
+                        </div>
+
+                        <canvas id="captureCanvas" class="d-none"></canvas>
+
+                        <div class="text-center">
+                            <div class="spinner-border text-primary spinner mt-3" id="cameraSpinner" role="status" style="display:none;">
+                                <span class="visually-hidden">Analyzing...</span>
+                            </div>
+
+                            <div class="alert alert-danger mt-3" id="cameraError" style="display: none;"></div>
+
+                            <div class="result-card" id="cameraResultCard">
+                                <h4 class="mt-4">Live Analysis Result</h4>
+                                <div class="card mt-3">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h5 class="card-title mb-0">Fruit: <span id="cameraFruitName">-</span></h5>
+                                            <span class="badge bg-success" id="cameraRipenessBadge">-</span>
+                                        </div>
+                                        <div class="progress mb-3" style="height: 25px;">
+                                            <div id="cameraConfidenceBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                                        </div>
+                                        <p class="card-text" id="cameraConfidenceText">Confidence: 0%</p>
+                                        <p class="card-text" id="cameraAdviceText"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4 text-center text-muted">
+                    <small>Built with ❤️ for Deep Learning Course Project</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+            const preview = document.getElementById('preview');
+            const browseBtn = document.getElementById('browseBtn');
+            const uploadForm = document.getElementById('uploadForm');
+            const spinner = document.querySelector('.spinner');
+            const errorAlert = document.getElementById('errorAlert');
+            const errorMessage = document.getElementById('errorMessage');
+            const resultCard = document.getElementById('resultCard');
+            const fruitName = document.getElementById('fruitName');
+            const ripenessBadge = document.getElementById('ripenessBadge');
+            const confidenceBar = document.getElementById('confidenceBar');
+            const confidenceText = document.getElementById('confidenceText');
+            const adviceText = document.getElementById('adviceText');
+
+            // Handle drag and drop
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight() {
+                dropZone.classList.add('border-primary');
+                dropZone.style.backgroundColor = '#f8f9fa';
+            }
+
+            function unhighlight() {
+                dropZone.classList.remove('border-primary');
+                dropZone.style.backgroundColor = '';
+            }
+
+            // Handle dropped files
+            dropZone.addEventListener('drop', handleDrop, false);
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            }
+
+            // Handle file selection via button
+            browseBtn.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', function() {
+                handleFiles(this.files);
+            });
+
+            function handleFiles(files) {
+                if (files.length > 0) {
+                    const file = files[0];
+                    
+                    // Check file type
+                    if (!file.type.match('image.*')) {
+                        showError('Please select an image file (JPG, PNG, GIF)');
+                        return;
+                    }
+                    
+                    // Check file size (max 5MB)
+                    if (file.size > 5 * 1024 * 1024) {
+                        showError('File is too large. Maximum size is 5MB.');
+                        return;
+                    }
+                    
+                    // Display preview
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        preview.src = e.target.result;
+                        preview.style.display = 'block';
+                        
+                        // Hide any previous results and errors
+                        resultCard.style.display = 'none';
+                        hideError();
+                        
+                        // Upload the file
+                        uploadFile(file);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+
+            function uploadFile(file) {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // Show loading spinner
+                spinner.style.display = 'block';
+                
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Hide spinner
+                    spinner.style.display = 'none';
+                    
+                    if (data.status === 'success') {
+                        // Display results
+                        displayResults(data);
+                    } else {
+                        showError(data.message || 'An error occurred while processing the image.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    spinner.style.display = 'none';
+                    showError('An error occurred while uploading the file.');
+                });
+            }
+
+            function displayResults(data) {
+                // Update UI with results
+                fruitName.textContent = data.fruit_type.charAt(0).toUpperCase() + data.fruit_type.slice(1);
+                
+                const confidence = Math.round(data.confidence * 100);
+                const isRipe = data.prediction.toLowerCase() === 'ripe';
+                
+                // Update ripeness badge
+                ripenessBadge.textContent = isRipe ? 'Ripe' : 'Not Ripe';
+                ripenessBadge.className = `badge ${isRipe ? 'bg-success' : 'bg-warning'}`;
+                
+                // Update confidence bar
+                confidenceBar.style.width = `${confidence}%`;
+                confidenceBar.textContent = `${confidence}%`;
+                confidenceBar.className = `progress-bar progress-bar-striped progress-bar-animated ${isRipe ? 'bg-success' : 'bg-warning'}`;
+                
+                // Update confidence text
+                confidenceText.textContent = `Confidence: ${confidence}%`;
+                
+                // Add some advice based on ripeness
+                if (isRipe) {
+                    adviceText.textContent = 'This fruit is ready to eat! Enjoy!';
+                    adviceText.className = 'card-text text-success';
+                } else {
+                    adviceText.textContent = 'This fruit needs more time to ripen.';
+                    adviceText.className = 'card-text text-warning';
+                }
+                
+                // Show the result card
+                resultCard.style.display = 'block';
+            }
+
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorAlert.style.display = 'block';
+                resultCard.style.display = 'none';
+            }
+
+            function hideError() {
+                errorAlert.style.display = 'none';
+            }
+
+            // ===== Live Camera Analyze =====
+            const startCameraBtn = document.getElementById('startCameraBtn');
+            const stopCameraBtn = document.getElementById('stopCameraBtn');
+            const captureBtn = document.getElementById('captureBtn');
+            const toggleDatasetBtn = document.getElementById('toggleDatasetBtn');
+            const autoAnalyzeSwitch = document.getElementById('autoAnalyzeSwitch');
+            const intervalRange = document.getElementById('intervalRange');
+            const intervalLabel = document.getElementById('intervalLabel');
+            const cameraVideo = document.getElementById('cameraVideo');
+            const captureCanvas = document.getElementById('captureCanvas');
+            const cameraSpinner = document.getElementById('cameraSpinner');
+            const cameraError = document.getElementById('cameraError');
+            const cameraResultCard = document.getElementById('cameraResultCard');
+            const cameraFruitName = document.getElementById('cameraFruitName');
+            const cameraRipenessBadge = document.getElementById('cameraRipenessBadge');
+            const cameraConfidenceBar = document.getElementById('cameraConfidenceBar');
+            const cameraConfidenceText = document.getElementById('cameraConfidenceText');
+            const cameraAdviceText = document.getElementById('cameraAdviceText');
+
+            // Dataset collection elements
+            const datasetCard = document.getElementById('datasetCard');
+            const classSelect = document.getElementById('classSelect');
+            const customClass = document.getElementById('customClass');
+            const splitSelect = document.getElementById('splitSelect');
+            const saveFrameBtn = document.getElementById('saveFrameBtn');
+            const savedCount = document.getElementById('savedCount');
+
+            let mediaStream = null;
+            let autoTimer = null;
+            let analyzing = false;
+            let datasetMode = false;
+            let savedImageCount = 0;
+
+            function showCameraError(msg) {
+                cameraError.textContent = msg;
+                cameraError.style.display = 'block';
+            }
+            function hideCameraError() {
+                cameraError.style.display = 'none';
+            }
+
+            async function startCamera() {
+                try {
+                    hideCameraError();
+                    mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+                    cameraVideo.srcObject = mediaStream;
+                    startCameraBtn.disabled = true;
+                    stopCameraBtn.disabled = false;
+                    captureBtn.disabled = false;
+                    autoAnalyzeSwitch.disabled = false;
+                    intervalRange.disabled = false;
+                    toggleDatasetBtn.disabled = false;
+                    saveFrameBtn.disabled = false;
+                } catch (err) {
+                    showCameraError('Failed to access camera. Please allow camera permission.');
+                }
+            }
+
+            function stopCamera() {
+                if (mediaStream) {
+                    mediaStream.getTracks().forEach(t => t.stop());
+                    mediaStream = null;
+                }
+                startCameraBtn.disabled = false;
+                stopCameraBtn.disabled = true;
+                captureBtn.disabled = true;
+                autoAnalyzeSwitch.checked = false;
+                autoAnalyzeSwitch.disabled = true;
+                intervalRange.disabled = true;
+                toggleDatasetBtn.disabled = true;
+                saveFrameBtn.disabled = true;
+                datasetCard.style.display = 'none';
+                datasetMode = false;
+                if (autoTimer) {
+                    clearInterval(autoTimer);
+                    autoTimer = null;
+                }
+            }
+
+            function displayCameraResults(data) {
+                cameraFruitName.textContent = data.fruit_type.charAt(0).toUpperCase() + data.fruit_type.slice(1);
+                const confidence = Math.round(data.confidence * 100);
+                const isRipe = data.prediction.toLowerCase() === 'ripe';
+                cameraRipenessBadge.textContent = isRipe ? 'Ripe' : (data.prediction || 'Not Ripe');
+                cameraRipenessBadge.className = `badge ${isRipe ? 'bg-success' : 'bg-warning'}`;
+                cameraConfidenceBar.style.width = `${confidence}%`;
+                cameraConfidenceBar.textContent = `${confidence}%`;
+                cameraConfidenceBar.className = `progress-bar progress-bar-striped progress-bar-animated ${isRipe ? 'bg-success' : 'bg-warning'}`;
+                cameraConfidenceText.textContent = `Confidence: ${confidence}%`;
+                if (isRipe) {
+                    cameraAdviceText.textContent = 'This fruit is ready to eat!';
+                    cameraAdviceText.className = 'card-text text-success';
+                } else {
+                    cameraAdviceText.textContent = 'This fruit might need more time.';
+                    cameraAdviceText.className = 'card-text text-warning';
+                }
+                cameraResultCard.style.display = 'block';
+            }
+
+            function captureFrameAndAnalyze() {
+                if (!mediaStream || analyzing) return;
+                analyzing = true;
+                cameraSpinner.style.display = 'inline-block';
+
+                const video = cameraVideo;
+                const canvas = captureCanvas;
+                const w = video.videoWidth;
+                const h = video.videoHeight;
+                if (!w || !h) {
+                    analyzing = false;
+                    cameraSpinner.style.display = 'none';
+                    return;
+                }
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, w, h);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+                fetch('/analyze_frame', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: dataUrl })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    cameraSpinner.style.display = 'none';
+                    analyzing = false;
+                    if (data.status === 'success') {
+                        displayCameraResults(data);
+                    } else {
+                        showCameraError(data.message || 'Analyze error');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    cameraSpinner.style.display = 'none';
+                    analyzing = false;
+                    showCameraError('Network error while analyzing frame');
+                });
+            }
+
+            startCameraBtn.addEventListener('click', startCamera);
+            stopCameraBtn.addEventListener('click', stopCamera);
+            captureBtn.addEventListener('click', captureFrameAndAnalyze);
+            intervalRange.addEventListener('input', () => {
+                intervalLabel.textContent = intervalRange.value;
+                if (autoTimer) {
+                    clearInterval(autoTimer);
+                    autoTimer = setInterval(captureFrameAndAnalyze, parseInt(intervalRange.value, 10));
+                }
+            });
+            autoAnalyzeSwitch.addEventListener('change', () => {
+                if (autoAnalyzeSwitch.checked) {
+                    captureFrameAndAnalyze();
+                    autoTimer = setInterval(captureFrameAndAnalyze, parseInt(intervalRange.value, 10));
+                } else if (autoTimer) {
+                    clearInterval(autoTimer);
+                    autoTimer = null;
+                }
+            });
+
+            // ===== Dataset Collection =====
+            function toggleDatasetMode() {
+                datasetMode = !datasetMode;
+                if (datasetMode) {
+                    datasetCard.style.display = 'block';
+                    toggleDatasetBtn.innerHTML = '<i class="bi bi-camera-fill me-1"></i>Analyze Mode';
+                    toggleDatasetBtn.className = 'btn btn-info';
+                } else {
+                    datasetCard.style.display = 'none';
+                    toggleDatasetBtn.innerHTML = '<i class="bi bi-database me-1"></i>Dataset Mode';
+                    toggleDatasetBtn.className = 'btn btn-outline-info';
+                }
+            }
+
+            function getCurrentClassName() {
+                if (classSelect.value === 'custom') {
+                    return customClass.value.trim();
+                }
+                return classSelect.value;
+            }
+
+            function saveCurrentFrame() {
+                if (!mediaStream || analyzing) return;
+                
+                const className = getCurrentClassName();
+                if (!className) {
+                    showCameraError('Please enter a class name');
+                    return;
+                }
+
+                analyzing = true;
+                cameraSpinner.style.display = 'inline-block';
+
+                const video = cameraVideo;
+                const canvas = captureCanvas;
+                const w = video.videoWidth;
+                const h = video.videoHeight;
+                if (!w || !h) {
+                    analyzing = false;
+                    cameraSpinner.style.display = 'none';
+                    return;
+                }
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, w, h);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+                fetch('/save_frame', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        image: dataUrl, 
+                        class_name: className,
+                        split: splitSelect.value
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    cameraSpinner.style.display = 'none';
+                    analyzing = false;
+                    if (data.status === 'success') {
+                        savedImageCount++;
+                        savedCount.textContent = savedImageCount;
+                        hideCameraError();
+                        // Brief success feedback
+                        saveFrameBtn.innerHTML = '<i class="bi bi-check me-1"></i>Saved!';
+                        saveFrameBtn.className = 'btn btn-success btn-sm w-100';
+                        setTimeout(() => {
+                            saveFrameBtn.innerHTML = '<i class="bi bi-save me-1"></i>Save Frame';
+                            saveFrameBtn.className = 'btn btn-success btn-sm w-100';
+                        }, 1000);
+                    } else {
+                        showCameraError(data.message || 'Failed to save frame');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    cameraSpinner.style.display = 'none';
+                    analyzing = false;
+                    showCameraError('Network error while saving frame');
+                });
+            }
+
+            // Event listeners for dataset collection
+            toggleDatasetBtn.addEventListener('click', toggleDatasetMode);
+            saveFrameBtn.addEventListener('click', saveCurrentFrame);
+            
+            classSelect.addEventListener('change', () => {
+                if (classSelect.value === 'custom') {
+                    customClass.style.display = 'block';
+                    customClass.focus();
+                } else {
+                    customClass.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
